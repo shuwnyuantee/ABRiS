@@ -66,17 +66,26 @@ object functions {
    *
    */
 
-  lazy val from_confluent_avro_timer = UserMetricsSystem.timer("from_confluent_avro")
+  var metricsInitialized: Boolean = false
+
+  def initMetrics(): Unit = {
+   if (!metricsInitialized) {
+     val spark = SparkSession.builder().getOrCreate()
+     import spark.implicits._
+     UserMetricsSystem.initialize(spark.sparkContext, "CustomMetrics")
+
+     metricsInitialized = true
+   }
+  }
+
+  //lazy val from_confluent_avro_timer = UserMetricsSystem.timer("from_confluent_avro")
 
   def from_confluent_avro(data: Column, schemaRegistryConf: Map[String,String]): Column = {
-    val spark = SparkSession.builder().getOrCreate()
-    import spark.implicits._
+    initMetrics()
 
-    UserMetricsSystem.initialize(spark.sparkContext, "CustomMetrics")
-
-    val _from_confluent_avro_timer = from_confluent_avro_timer.time()
+    //val _from_confluent_avro_timer = from_confluent_avro_timer.time()
     val column = new Column(sql.AvroDataToCatalyst(data.expr, None, Some(schemaRegistryConf), confluentCompliant = true))
-    _from_confluent_avro_timer.close()
+    //_from_confluent_avro_timer.close()
 
     return column
   }
