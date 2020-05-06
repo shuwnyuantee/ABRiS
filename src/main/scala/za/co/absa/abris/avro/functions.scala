@@ -19,7 +19,8 @@ package za.co.absa.abris.avro
 import org.apache.spark.sql.Column
 import za.co.absa.abris.avro.read.confluent.SchemaManager
 import za.co.absa.abris.avro.sql.{AvroDataToCatalyst, CatalystDataToAvro, SchemaProvider}
-
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.groupon.metrics.UserMetricsSystem
 
 // scalastyle:off: object.name
 object functions {
@@ -64,8 +65,20 @@ object functions {
    * @param schemaRegistryConf schema registry configuration.
    *
    */
+
+  lazy val from_confluent_avro_timer = UserMetricsSystem.timer("from_confluent_avro")
+
   def from_confluent_avro(data: Column, schemaRegistryConf: Map[String,String]): Column = {
-    new Column(sql.AvroDataToCatalyst(data.expr, None, Some(schemaRegistryConf), confluentCompliant = true))
+    val spark = SparkSession.builder().getOrCreate()
+    import spark.implicits._
+
+    UserMetricsSystem.initialize(spark.sparkContext, "CustomMetrics")
+
+    val _from_confluent_avro_timer = from_confluent_avro_timer.time()
+    val column = new Column(sql.AvroDataToCatalyst(data.expr, None, Some(schemaRegistryConf), confluentCompliant = true))
+    _from_confluent_avro_timer.close()
+
+    return column
   }
 
   /**
