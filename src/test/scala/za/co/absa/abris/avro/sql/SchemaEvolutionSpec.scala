@@ -34,6 +34,8 @@ class SchemaEvolutionSpec extends FlatSpec with Matchers with BeforeAndAfterEach
     .master("local[2]")
     .getOrCreate()
 
+  import spark.implicits._
+
   private val schemaRegistryConfig = Map(
     SchemaManager.PARAM_SCHEMA_REGISTRY_TOPIC -> "test_topic",
     SchemaManager.PARAM_SCHEMA_REGISTRY_URL -> "dummy",
