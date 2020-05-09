@@ -19,7 +19,8 @@ package za.co.absa.abris.avro
 import org.apache.spark.sql.Column
 import za.co.absa.abris.avro.read.confluent.SchemaManager
 import za.co.absa.abris.avro.sql.{AvroDataToCatalyst, CatalystDataToAvro, SchemaProvider}
-
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.groupon.metrics.UserMetricsSystem
 
 // scalastyle:off: object.name
 object functions {
@@ -52,6 +53,17 @@ object functions {
     new Column(sql.AvroDataToCatalyst(data.expr, None, Some(schemaRegistryConf), confluentCompliant = false))
   }
 
+  var metricsInitialized: Boolean = false
+  def initMetrics(): Unit = {
+   if (!metricsInitialized) {
+     val spark = SparkSession.builder().getOrCreate()
+     import spark.implicits._
+     UserMetricsSystem.initialize(spark.sparkContext, "CustomMetrics")
+
+     metricsInitialized = true
+   }
+  }
+
   /**
    * Converts a binary column of confluent avro format into its corresponding catalyst value using schema registry.
    * There are two avro schemas used: writer schema and reader schema.
@@ -65,6 +77,7 @@ object functions {
    *
    */
   def from_confluent_avro(data: Column, schemaRegistryConf: Map[String,String]): Column = {
+    initMetrics()
     new Column(sql.AvroDataToCatalyst(data.expr, None, Some(schemaRegistryConf), confluentCompliant = true))
   }
 
