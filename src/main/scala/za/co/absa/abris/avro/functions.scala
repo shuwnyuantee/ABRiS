@@ -77,7 +77,7 @@ object functions {
    *
    */
   def from_confluent_avro(data: Column, schemaRegistryConf: Map[String,String]): Column = {
-    initMetrics()
+    //initMetrics()
     new Column(sql.AvroDataToCatalyst(data.expr, None, Some(schemaRegistryConf), confluentCompliant = true))
   }
 
