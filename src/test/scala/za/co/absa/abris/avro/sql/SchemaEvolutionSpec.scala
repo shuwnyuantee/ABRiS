@@ -24,6 +24,7 @@ import za.co.absa.abris.avro.format.SparkAvroConversions
 import za.co.absa.abris.avro.functions._
 import za.co.absa.abris.avro.parsing.utils.AvroSchemaUtils
 import za.co.absa.abris.avro.read.confluent.SchemaManager
+import org.apache.spark.groupon.metrics.UserMetricsSystem
 
 class SchemaEvolutionSpec extends FlatSpec with Matchers with BeforeAndAfterEach
 {
@@ -34,6 +35,7 @@ class SchemaEvolutionSpec extends FlatSpec with Matchers with BeforeAndAfterEach
     .getOrCreate()
 
   import spark.implicits._
+  UserMetricsSystem.initialize(spark.sparkContext, "CustomMetrics")
 
   private val schemaRegistryConfig = Map(
     SchemaManager.PARAM_SCHEMA_REGISTRY_TOPIC -> "test_topic",
