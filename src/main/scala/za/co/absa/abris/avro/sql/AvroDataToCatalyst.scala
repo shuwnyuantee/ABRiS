@@ -129,7 +129,7 @@ case class AvroDataToCatalyst(
     val data = reader.read(reader, decoder)
     //_readerTimer.close()
 
-    _//decodeConfluentAvroTimer.close()
+    //_decodeConfluentAvroTimer.close()
     return data
   }
 
