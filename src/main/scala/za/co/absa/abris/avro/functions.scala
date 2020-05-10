@@ -76,6 +76,9 @@ object functions {
    * @param schemaRegistryConf schema registry configuration.
    *
    */
+
+  lazy val from_confluent_avro_timer = UserMetricsSystem.timer("from_confluent_avro")
+
   def from_confluent_avro(data: Column, schemaRegistryConf: Map[String,String]): Column = {
     initMetrics()
 
