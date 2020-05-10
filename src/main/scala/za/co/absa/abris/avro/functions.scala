@@ -27,6 +27,17 @@ object functions {
 // scalastyle:on: object.name
 // scalastyle:off: method.name
 
+  var metricsInitialized: Boolean = false
+  def initMetrics(): Unit = {
+   if (!metricsInitialized) {
+     val spark = SparkSession.builder().getOrCreate()
+     //import spark.implicits._
+     UserMetricsSystem.initialize(spark.sparkContext, "CustomMetrics")
+
+     metricsInitialized = true
+   }
+  }
+
   /**
    * Converts a binary column of avro format into its corresponding catalyst value. The specified
    * schema must match the read data, otherwise the behavior is undefined: it may fail or return
@@ -37,6 +48,7 @@ object functions {
    *
    */
   def from_avro(data: Column, jsonFormatSchema: String): Column = {
+    initMetrics()
     new Column(AvroDataToCatalyst(data.expr, Some(jsonFormatSchema), None, confluentCompliant = false))
   }
 
@@ -50,18 +62,8 @@ object functions {
    *
    */
   def from_avro(data: Column, schemaRegistryConf: Map[String,String]): Column = {
+    initMetrics()
     new Column(sql.AvroDataToCatalyst(data.expr, None, Some(schemaRegistryConf), confluentCompliant = false))
-  }
-
-  var metricsInitialized: Boolean = false
-  def initMetrics(): Unit = {
-   if (!metricsInitialized) {
-     val spark = SparkSession.builder().getOrCreate()
-     import spark.implicits._
-     UserMetricsSystem.initialize(spark.sparkContext, "CustomMetrics")
-
-     metricsInitialized = true
-   }
   }
 
   /**
@@ -104,6 +106,7 @@ object functions {
    *
    */
   def from_confluent_avro(data: Column, readerSchema: String, schemaRegistryConf: Map[String,String]): Column = {
+    initMetrics()
     new Column(sql.AvroDataToCatalyst(
       data.expr, Some(readerSchema), Some(schemaRegistryConf), confluentCompliant = true))
   }
