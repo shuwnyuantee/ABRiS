@@ -67,19 +67,19 @@ case class AvroDataToCatalyst(
   @transient private var decoder: BinaryDecoder = _
 
   override def nullSafeEval(input: Any): Any = {
-    val _nullSafeEvalTimer = nullSafeEvalTimer.time()
+    //val _nullSafeEvalTimer = nullSafeEvalTimer.time()
     val binary = input.asInstanceOf[Array[Byte]]
     var deserializeData : Any = null
 
     try {
-      val _decodeTimer = decodeTimer.time()
+      //val _decodeTimer = decodeTimer.time()
       val intermediateData = decode(binary)
-      _decodeTimer.close()
+      //_decodeTimer.close()
 
-      val _deserializeTimer = deserializeTimer.time()
+      //val _deserializeTimer = deserializeTimer.time()
       val deserializer = new AvroDeserializer(avroSchema, dataType)
       deserializeData = deserializer.deserialize(intermediateData)
-      _deserializeTimer.close()
+      //_deserializeTimer.close()
 
     } catch {
       // There could be multiple possible exceptions here, e.g. java.io.IOException,
@@ -88,7 +88,7 @@ case class AvroDataToCatalyst(
       case NonFatal(e) =>  throw new SparkException("Malformed records are detected in record parsing.", e)
     }
 
-    _nullSafeEvalTimer.close()
+    //_nullSafeEvalTimer.close()
     return deserializeData
   }
 
@@ -107,7 +107,7 @@ case class AvroDataToCatalyst(
   }
 
   private def decodeConfluentAvro(payload: Array[Byte]): Any  = {
-    val _decodeConfluentAvroTimer = decodeConfluentAvroTimer.time()
+    //val _decodeConfluentAvroTimer = decodeConfluentAvroTimer.time()
 
     val buffer = ByteBuffer.wrap(payload)
     if (buffer.get() != ConfluentConstants.MAGIC_BYTE) {
@@ -120,16 +120,16 @@ case class AvroDataToCatalyst(
     val length = buffer.limit() - 1 - ConfluentConstants.SCHEMA_ID_SIZE_BYTES
     decoder = DecoderFactory.get().binaryDecoder(buffer.array(), start, length, decoder)
 
-    val _getWriterSchemaTimer = getWriterSchemaTimer.time()
+    //val _getWriterSchemaTimer = getWriterSchemaTimer.time()
     val writerSchema = getWriterSchema(schemaId)
-    _getWriterSchemaTimer.close()
+    //_getWriterSchemaTimer.close()
 
-    val _readerTimer = readerTimer.time()
+    //val _readerTimer = readerTimer.time()
     reader = new GenericDatumReader[Any](writerSchema, avroSchema)
     val data = reader.read(reader, decoder)
-    _readerTimer.close()
+    //_readerTimer.close()
 
-    _decodeConfluentAvroTimer.close()
+    _//decodeConfluentAvroTimer.close()
     return data
   }
 
@@ -149,7 +149,7 @@ case class AvroDataToCatalyst(
   }
 
   private def loadSchemaFromRegistry(registryConfig: Map[String, String]): Schema = {
-    val _loadSchemaFromRegistryTimer = loadSchemaFromRegistryTimer.time()
+    //val _loadSchemaFromRegistryTimer = loadSchemaFromRegistryTimer.time()
 
     val id = SchemaManager.getIdFromConfig(registryConfig)
     var config = registryConfig
@@ -163,7 +163,7 @@ case class AvroDataToCatalyst(
       schema = AvroSchemaUtils.loadForValue(config)
     }
 
-    _loadSchemaFromRegistryTimer.close()
+    //_loadSchemaFromRegistryTimer.close()
     return schema
   }
 
