@@ -31,7 +31,6 @@ object functions {
   def initMetrics(): Unit = {
    if (!metricsInitialized) {
      val spark = SparkSession.builder().getOrCreate()
-     //import spark.implicits._
      UserMetricsSystem.initialize(spark.sparkContext, "CustomMetrics")
 
      metricsInitialized = true
