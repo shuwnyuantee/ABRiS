@@ -1,0 +1,8 @@
+version: "3"
+services:
+    abris:
+        image: docker-clickstream.artifactory.internetbrands.com/ib-spark:v2.4.3-20200512_112513Z
+        volumes:
+            - ./:/code/abris
+        working_dir: /code/abris
+        command: /opt/maven/bin/mvn clean package
