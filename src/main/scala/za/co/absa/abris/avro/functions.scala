@@ -19,12 +19,23 @@ package za.co.absa.abris.avro
 import org.apache.spark.sql.Column
 import za.co.absa.abris.avro.read.confluent.SchemaManager
 import za.co.absa.abris.avro.sql.{AvroDataToCatalyst, CatalystDataToAvro, SchemaProvider}
-
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.groupon.metrics.UserMetricsSystem
 
 // scalastyle:off: object.name
 object functions {
 // scalastyle:on: object.name
 // scalastyle:off: method.name
+
+  var metricsInitialized: Boolean = false
+  def initMetrics(): Unit = {
+   if (!metricsInitialized) {
+     val spark = SparkSession.builder().getOrCreate()
+     UserMetricsSystem.initialize(spark.sparkContext, "CustomMetrics")
+
+     metricsInitialized = true
+   }
+  }
 
   /**
    * Converts a binary column of avro format into its corresponding catalyst value. The specified
@@ -36,6 +47,7 @@ object functions {
    *
    */
   def from_avro(data: Column, jsonFormatSchema: String): Column = {
+    initMetrics()
     new Column(AvroDataToCatalyst(data.expr, Some(jsonFormatSchema), None, confluentCompliant = false))
   }
 
@@ -49,6 +61,7 @@ object functions {
    *
    */
   def from_avro(data: Column, schemaRegistryConf: Map[String,String]): Column = {
+    initMetrics()
     new Column(sql.AvroDataToCatalyst(data.expr, None, Some(schemaRegistryConf), confluentCompliant = false))
   }
 
@@ -64,8 +77,17 @@ object functions {
    * @param schemaRegistryConf schema registry configuration.
    *
    */
+
+  lazy val from_confluent_avro_timer = UserMetricsSystem.timer("from_confluent_avro")
+
   def from_confluent_avro(data: Column, schemaRegistryConf: Map[String,String]): Column = {
-    new Column(sql.AvroDataToCatalyst(data.expr, None, Some(schemaRegistryConf), confluentCompliant = true))
+    initMetrics()
+
+    val _from_confluent_avro_timer = from_confluent_avro_timer.time()
+    val column = new Column(sql.AvroDataToCatalyst(data.expr, None, Some(schemaRegistryConf), confluentCompliant = true))
+    _from_confluent_avro_timer.close()
+
+    return column
   }
 
   /**
@@ -83,6 +105,7 @@ object functions {
    *
    */
   def from_confluent_avro(data: Column, readerSchema: String, schemaRegistryConf: Map[String,String]): Column = {
+    initMetrics()
     new Column(sql.AvroDataToCatalyst(
       data.expr, Some(readerSchema), Some(schemaRegistryConf), confluentCompliant = true))
   }
