@@ -34,6 +34,7 @@ import za.co.absa.abris.avro.schemas.SchemaLoader
 
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
+import org.apache.spark.groupon.metrics.UserMetricsSystem
 
 case class AvroDataToCatalyst(
    child: Expression,
@@ -41,6 +42,13 @@ case class AvroDataToCatalyst(
    schemaRegistryConf: Option[Map[String,String]],
    confluentCompliant: Boolean)
   extends UnaryExpression with ExpectsInputTypes {
+
+  lazy val nullSafeEvalTimer = UserMetricsSystem.timer("AvroDataToCatalyst-nullSafeEval")
+  lazy val decodeConfluentAvroTimer = UserMetricsSystem.timer("AvroDataToCatalyst-decodeConfluentAvro")
+  lazy val deserializeTimer = UserMetricsSystem.timer("AvroDataToCatalyst-deserialize")
+  lazy val getWriterSchemaTimer = UserMetricsSystem.timer("AvroDataToCatalyst-getWriterSchema")
+  lazy val readerTimer = UserMetricsSystem.timer("AvroDataToCatalyst-reader")
+  @transient lazy val loadSchemaFromRegistryTimer = UserMetricsSystem.timer("AvroDataToCatalyst-loadSchemaFromRegistry")
 
   override def inputTypes: Seq[BinaryType.type] = Seq(BinaryType)
 
@@ -58,19 +66,28 @@ case class AvroDataToCatalyst(
   @transient private var decoder: BinaryDecoder = _
 
   override def nullSafeEval(input: Any): Any = {
+    val _nullSafeEvalTimer = nullSafeEvalTimer.time()
     val binary = input.asInstanceOf[Array[Byte]]
+    var deserializeData : Any = null
+
     try {
       val intermediateData = decode(binary)
 
+      val _deserializeTimer = deserializeTimer.time()
       val deserializer = new AvroDeserializer(avroSchema, dataType)
-      deserializer.deserialize(intermediateData)
+      deserializeData = deserializer.deserialize(intermediateData)
+      _deserializeTimer.close()
 
     } catch {
       // There could be multiple possible exceptions here, e.g. java.io.IOException,
       // AvroRuntimeException, ArrayIndexOutOfBoundsException, etc.
       // To make it simple, catch all the exceptions here.
       case NonFatal(e) =>  throw new SparkException("Malformed records are detected in record parsing.", e)
+    } finally {
+      _nullSafeEvalTimer.close()
     }
+
+    deserializeData
   }
 
   override def prettyName: String = "from_avro"
@@ -88,6 +105,7 @@ case class AvroDataToCatalyst(
   }
 
   private def decodeConfluentAvro(payload: Array[Byte]): Any  = {
+    val _decodeConfluentAvroTimer = decodeConfluentAvroTimer.time()
 
     val buffer = ByteBuffer.wrap(payload)
     if (buffer.get() != ConfluentConstants.MAGIC_BYTE) {
@@ -100,10 +118,19 @@ case class AvroDataToCatalyst(
     val length = buffer.limit() - 1 - ConfluentConstants.SCHEMA_ID_SIZE_BYTES
     decoder = DecoderFactory.get().binaryDecoder(buffer.array(), start, length, decoder)
 
+    val _getWriterSchemaTimer = getWriterSchemaTimer.time()
     val writerSchema = getWriterSchema(schemaId)
+    _getWriterSchemaTimer.close()
+
+    val _readerTimer = readerTimer.time()
     reader = new GenericDatumReader[Any](writerSchema, avroSchema)
 
-    reader.read(reader, decoder)
+    try {
+      reader.read(reader, decoder)
+    } finally {
+      _readerTimer.close()
+      _decodeConfluentAvroTimer.close()
+    }
   }
 
   private def getWriterSchema(id: Int): Schema = {
@@ -122,14 +149,21 @@ case class AvroDataToCatalyst(
   }
 
   private def loadSchemaFromRegistry(registryConfig: Map[String, String]): Schema = {
+    val _loadSchemaFromRegistryTimer = loadSchemaFromRegistryTimer.time()
+
     val id = SchemaManager.getIdFromConfig(registryConfig)
     var config = registryConfig
-    if(SchemaManager.isKey(registryConfig)) {
-      if (id.isDefined) config = config ++ Map(SchemaManager.PARAM_KEY_SCHEMA_ID -> id.get.toString)
-      AvroSchemaUtils.loadForKey(config)
-    } else {
-      if (id.isDefined) config = config ++ Map(SchemaManager.PARAM_VALUE_SCHEMA_ID -> id.get.toString)
-      AvroSchemaUtils.loadForValue(config)
+
+    try {
+      if (SchemaManager.isKey(registryConfig)) {
+        if (id.isDefined) config = config ++ Map(SchemaManager.PARAM_KEY_SCHEMA_ID -> id.get.toString)
+        AvroSchemaUtils.loadForKey(config)
+      } else {
+        if (id.isDefined) config = config ++ Map(SchemaManager.PARAM_VALUE_SCHEMA_ID -> id.get.toString)
+        AvroSchemaUtils.loadForValue(config)
+      }
+    } finally {
+        _loadSchemaFromRegistryTimer.close()
     }
   }
 
